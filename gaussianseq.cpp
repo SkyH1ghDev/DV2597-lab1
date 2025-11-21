@@ -4,19 +4,23 @@
  *
  ***************************************************************************/
 
-#include <stdio.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <chrono>
 
 #define MAX_SIZE 4096
 
-typedef double matrix[MAX_SIZE][MAX_SIZE];
+typedef double Matrix[MAX_SIZE][MAX_SIZE];
 
-int	N;		/* matrix size		*/
-int	maxnum;		/* max number of element*/
+int	matrixSize;		/* matrix size		*/
+int	maxNumber;		/* max number of element*/
 char	*Init;		/* matrix init type	*/
 int	PRINT;		/* print switch		*/
-matrix	A;		/* matrix A		*/
-double	b[MAX_SIZE];	/* vector b             */
-double	y[MAX_SIZE];	/* vector y             */
+Matrix	matrix;		/* matrix A		*/
+double	equalities[MAX_SIZE];	/* vector b             */
+double	result[MAX_SIZE];	/* vector y             */
 
 /* forward declarations */
 void work(void);
@@ -33,9 +37,15 @@ main(int argc, char **argv)
     Init_Default();		/* Init default values	*/
     Read_Options(argc,argv);	/* Read arguments	*/
     Init_Matrix();		/* Init the matrix	*/
+
+    auto t1 = std::chrono::high_resolution_clock::now();
     work();
+    auto t2 = std::chrono::high_resolution_clock::now();
+
     if (PRINT == 1)
 	   Print_Matrix();
+
+    std::cout << std::chrono::duration<double>(t2-t1);
 }
 
 void
@@ -44,16 +54,16 @@ work(void)
     int i, j, k;
 
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    for (k = 0; k < N; k++) { /* Outer loop */
-	    for (j = k+1; j < N; j++)
-	       A[k][j] = A[k][j] / A[k][k]; /* Division step */
-	    y[k] = b[k] / A[k][k];
-	    A[k][k] = 1.0;
-	    for (i = k+1; i < N; i++) {
-	        for (j = k+1; j < N; j++)
-		        A[i][j] = A[i][j] - A[i][k]*A[k][j]; /* Elimination step */
-	        b[i] = b[i] - A[i][k]*y[k];
-	        A[i][k] = 0.0;
+    for (k = 0; k < matrixSize; k++) { /* Outer loop */
+	    for (j = k+1; j < matrixSize; j++)
+	       matrix[k][j] = matrix[k][j] / matrix[k][k]; /* Division step */
+	    result[k] = equalities[k] / matrix[k][k];
+	    matrix[k][k] = 1.0;
+	    for (i = k+1; i < matrixSize; i++) {
+	        for (j = k+1; j < matrixSize; j++)
+		        matrix[i][j] = matrix[i][j] - matrix[i][k]*matrix[k][j]; /* Elimination step */
+	        equalities[i] = equalities[i] - matrix[i][k]*result[k];
+	        matrix[i][k] = 0.0;
 	    }
     }
 }
@@ -63,36 +73,36 @@ Init_Matrix()
 {
     int i, j;
 
-    printf("\nsize      = %dx%d ", N, N);
-    printf("\nmaxnum    = %d \n", maxnum);
+    printf("\nsize      = %dx%d ", matrixSize, matrixSize);
+    printf("\nmaxnum    = %d \n", maxNumber);
     printf("Init	  = %s \n", Init);
     printf("Initializing matrix...");
 
     if (strcmp(Init,"rand") == 0) {
-        for (i = 0; i < N; i++){
-            for (j = 0; j < N; j++) {
+        for (i = 0; i < matrixSize; i++){
+            for (j = 0; j < matrixSize; j++) {
                 if (i == j) /* diagonal dominance */
-                    A[i][j] = (double)(rand() % maxnum) + 5.0;
+                    matrix[i][j] = (double)(rand() % maxNumber) + 5.0;
                 else
-                    A[i][j] = (double)(rand() % maxnum) + 1.0;
+                    matrix[i][j] = (double)(rand() % maxNumber) + 1.0;
             }
         }
     }
     if (strcmp(Init,"fast") == 0) {
-        for (i = 0; i < N; i++) {
-            for (j = 0; j < N; j++) {
+        for (i = 0; i < matrixSize; i++) {
+            for (j = 0; j < matrixSize; j++) {
                 if (i == j) /* diagonal dominance */
-                    A[i][j] = 5.0;
+                    matrix[i][j] = 5.0;
                 else
-                    A[i][j] = 2.0;
+                    matrix[i][j] = 2.0;
             }
         }
     }
 
     /* Initialize vectors b and y */
-    for (i = 0; i < N; i++) {
-        b[i] = 2.0;
-        y[i] = 1.0;
+    for (i = 0; i < matrixSize; i++) {
+        equalities[i] = 2.0;
+        result[i] = 1.0;
     }
 
     printf("done \n\n");
@@ -106,19 +116,19 @@ Print_Matrix()
     int i, j;
 
     printf("Matrix A:\n");
-    for (i = 0; i < N; i++) {
+    for (i = 0; i < matrixSize; i++) {
         printf("[");
-        for (j = 0; j < N; j++)
-            printf(" %5.2f,", A[i][j]);
+        for (j = 0; j < matrixSize; j++)
+            printf(" %5.2f,", matrix[i][j]);
         printf("]\n");
     }
     printf("Vector b:\n[");
-    for (j = 0; j < N; j++)
-        printf(" %5.2f,", b[j]);
+    for (j = 0; j < matrixSize; j++)
+        printf(" %5.2f,", equalities[j]);
     printf("]\n");
     printf("Vector y:\n[");
-    for (j = 0; j < N; j++)
-        printf(" %5.2f,", y[j]);
+    for (j = 0; j < matrixSize; j++)
+        printf(" %5.2f,", result[j]);
     printf("]\n");
     printf("\n\n");
 }
@@ -126,9 +136,9 @@ Print_Matrix()
 void
 Init_Default()
 {
-    N = 2048;
+    matrixSize = 2048;
     Init = "rand";
-    maxnum = 15.0;
+    maxNumber = 15.0;
     PRINT = 0;
 }
 
@@ -143,7 +153,7 @@ Read_Options(int argc, char **argv)
             switch ( *++*argv ) {
                 case 'n':
                     --argc;
-                    N = atoi(*++argv);
+                    matrixSize = atoi(*++argv);
                     break;
                 case 'h':
                     printf("\nHELP: try sor -u \n\n");
@@ -159,7 +169,7 @@ Read_Options(int argc, char **argv)
                     exit(0);
                     break;
                 case 'D':
-                    printf("\nDefault:  n         = %d ", N);
+                    printf("\nDefault:  n         = %d ", matrixSize);
                     printf("\n          Init      = rand" );
                     printf("\n          maxnum    = 5 ");
                     printf("\n          P         = 0 \n\n");
@@ -171,7 +181,7 @@ Read_Options(int argc, char **argv)
                     break;
                 case 'm':
                     --argc;
-                    maxnum = atoi(*++argv);
+                    maxNumber = atoi(*++argv);
                     break;
                 case 'P':
                     --argc;
@@ -182,4 +192,5 @@ Read_Options(int argc, char **argv)
                     printf("HELP: try %s -u \n\n", prog);
                     break;
             }
+    return 0;
 }
