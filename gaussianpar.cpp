@@ -17,38 +17,42 @@
 
 typedef double Matrix[MAX_SIZE][MAX_SIZE];
 
-int	matrixSize;		/* matrix size		*/
-int	maxNumber;		/* max number of element*/
-char	*Init;		/* matrix init type	*/
-int	PRINT;		/* print switch		*/
-Matrix	matrix;		/* matrix A		*/
-double	equalities[MAX_SIZE];	/* vector b             */
-double	result[MAX_SIZE];	/* vector y             */
-constexpr int NUM_THREADS = 3;
+int matrixSize; /* matrix size		*/
+int maxNumber; /* max number of element*/
+char* Init; /* matrix init type	*/
+int PRINT; /* print switch		*/
+Matrix matrix; /* matrix A		*/
+double equalities[MAX_SIZE]; /* vector b             */
+double result[MAX_SIZE]; /* vector y             */
+constexpr int NUM_THREADS = 16;
 pthread_barrier_t barrier;
+
 struct ThreadArgs
 {
-    int i = 0;
-    int j = 0;
     int id = 0;
 };
 
 /* forward declarations */
 void* work(void* args);
+
 void* parFunc(void* args);
+
 void Init_Matrix(void);
+
 void Print_Matrix(void);
+
 void Init_Default(void);
-int Read_Options(int, char **);
+
+int Read_Options(int, char**);
 
 int
-main(int argc, char **argv)
+main(int argc, char** argv)
 {
     int i, timestart, timeend, iter;
 
-    Init_Default();		/* Init default values	*/
-    Read_Options(argc,argv);	/* Read arguments	*/
-    Init_Matrix();		/* Init the matrix	*/
+    Init_Default(); /* Init default values	*/
+    Read_Options(argc, argv); /* Read arguments	*/
+    Init_Matrix(); /* Init the matrix	*/
 
     std::array<pthread_t, NUM_THREADS> threadArr{};
     std::array<ThreadArgs, NUM_THREADS> threadArgs{};
@@ -58,15 +62,13 @@ main(int argc, char **argv)
 
     for (int i = 0; i < NUM_THREADS; ++i)
     {
-        threadArgs[i].i = 1;
-        threadArgs[i].j = 1;
         threadArgs[i].id = i;
-        pthread_create(&threadArr[i], nullptr, work, &threadArgs[i]);
+        static_cast<void>(pthread_create(&threadArr[i], nullptr, work, &threadArgs[i]));
     }
 
     for (int i = 0; i < NUM_THREADS; ++i)
     {
-        pthread_join(threadArr[i], nullptr);
+        static_cast<void>(pthread_join(threadArr[i], nullptr));
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();
@@ -83,80 +85,50 @@ main(int argc, char **argv)
 void*
 work(void* args)
 {
-    ThreadArgs* arguments = static_cast<ThreadArgs*>(args);
+    ThreadArgs* arguments = static_cast<ThreadArgs *>(args);
 
-    /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    for (int k = 0; k < matrixSize; ) /* Outer loop */
+    for (int k = 0; k < matrixSize; ++k)
     {
-
         // Dividerar raden och sätter värdet på diagonalen till ett
-        arguments->i = k + 1 + arguments->id;
-        while (true)
+
+        //std::cout << "Thread " << arguments->id << " has begun division step with K = " << k << "\n";
+
+        for (int i = k + 1 + arguments->id; i < matrixSize; i += NUM_THREADS)
         {
-            if (arguments->i >= matrixSize)
-            {
-                break;
-            }
-
-            matrix[k][arguments->i] = matrix[k][arguments->i] / matrix[k][k];
-
-            arguments->i += NUM_THREADS;
+            matrix[k][i] = matrix[k][i] / matrix[k][k];
         }
 
         pthread_barrier_wait(&barrier);
+
         if (arguments->id == 0)
         {
             result[k] = equalities[k] / matrix[k][k];
             matrix[k][k] = 1.0;
         }
 
+        pthread_barrier_wait(&barrier);
 
-        arguments->i = k + 1 + arguments->id;
-        while (true)
+        //std::cout << "Thread " << arguments->id << " has begun elimination step with K = " << k << "\n";
+
+        // ELIMINATION STEP
+
+        for (int i = k + 1 + arguments->id; i < matrixSize; i += NUM_THREADS)
         {
-
-            if (arguments->i >= matrixSize)
+            for (int j = k + 1; j < matrixSize; ++j)
             {
-                break;
+                matrix[i][j] = matrix[i][j] - matrix[i][k] * matrix[k][j];
             }
 
-            arguments->j = k + 1;
-            while (true)
-            {
-                if (arguments->j >= matrixSize)
-                {
-                    break;
-                }
-
-                matrix[arguments->i][arguments->j] = matrix[arguments->i][arguments->j] - matrix[arguments->i][k] * matrix[k][arguments->j]; /* Elimination step */
-                ++arguments->j;
-            }
-
-
-            if (arguments->id == 0)
-            {
-                equalities[arguments->i] = equalities[arguments->i] - matrix[arguments->i][k] * result[k];
-                matrix[arguments->i][k] = 0.0;
-            }
-
-            arguments->i += NUM_THREADS;
+            equalities[i] = equalities[i] - matrix[i][k] * result[k];
+            matrix[i][k] = 0.0;
         }
 
         pthread_barrier_wait(&barrier);
-
-        if (arguments->id == 0)
-        {
-            ++k;
-        }
     }
 
+    //std::cout << "Thread " << arguments->id << " has exited\n";
+
     return nullptr;
-}
-
-void*
-parFunc(void* args)
-{
-
 }
 
 void
@@ -169,19 +141,25 @@ Init_Matrix()
     printf("Init	  = %s \n", Init);
     printf("Initializing matrix...");
 
-    if (strcmp(Init,"rand") == 0) {
-        for (i = 0; i < matrixSize; i++){
-            for (j = 0; j < matrixSize; j++) {
+    if (strcmp(Init, "rand") == 0)
+    {
+        for (i = 0; i < matrixSize; i++)
+        {
+            for (j = 0; j < matrixSize; j++)
+            {
                 if (i == j) /* diagonal dominance */
-                    matrix[i][j] = (double)(rand() % maxNumber) + 5.0;
+                    matrix[i][j] = (double) (rand() % maxNumber) + 5.0;
                 else
-                    matrix[i][j] = (double)(rand() % maxNumber) + 1.0;
+                    matrix[i][j] = (double) (rand() % maxNumber) + 1.0;
             }
         }
     }
-    if (strcmp(Init,"fast") == 0) {
-        for (i = 0; i < matrixSize; i++) {
-            for (j = 0; j < matrixSize; j++) {
+    if (strcmp(Init, "fast") == 0)
+    {
+        for (i = 0; i < matrixSize; i++)
+        {
+            for (j = 0; j < matrixSize; j++)
+            {
                 if (i == j) /* diagonal dominance */
                     matrix[i][j] = 5.0;
                 else
@@ -191,7 +169,8 @@ Init_Matrix()
     }
 
     /* Initialize vectors b and y */
-    for (i = 0; i < matrixSize; i++) {
+    for (i = 0; i < matrixSize; i++)
+    {
         equalities[i] = 2.0;
         result[i] = 1.0;
     }
@@ -207,7 +186,8 @@ Print_Matrix()
     int i, j;
 
     printf("Matrix A:\n");
-    for (i = 0; i < matrixSize; i++) {
+    for (i = 0; i < matrixSize; i++)
+    {
         printf("[");
         for (j = 0; j < matrixSize; j++)
             printf(" %5.2f,", matrix[i][j]);
@@ -234,14 +214,15 @@ Init_Default()
 }
 
 int
-Read_Options(int argc, char **argv)
+Read_Options(int argc, char** argv)
 {
-    char    *prog;
+    char* prog;
 
     prog = *argv;
     while (++argv, --argc > 0)
         if (**argv == '-')
-            switch ( *++*argv ) {
+            switch (*++*argv)
+            {
                 case 'n':
                     --argc;
                     matrixSize = atoi(*++argv);
@@ -261,7 +242,7 @@ Read_Options(int argc, char **argv)
                     break;
                 case 'D':
                     printf("\nDefault:  n         = %d ", matrixSize);
-                    printf("\n          Init      = rand" );
+                    printf("\n          Init      = rand");
                     printf("\n          maxnum    = 5 ");
                     printf("\n          P         = 0 \n\n");
                     exit(0);
