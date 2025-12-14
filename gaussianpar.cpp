@@ -24,14 +24,13 @@ int	PRINT;		/* print switch		*/
 Matrix	matrix;		/* matrix A		*/
 double	equalities[MAX_SIZE];	/* vector b             */
 double	result[MAX_SIZE];	/* vector y             */
-constexpr int NUM_THREADS = 32;
+constexpr int NUM_THREADS = 3;
+pthread_barrier_t barrier;
 struct ThreadArgs
 {
     int i = 0;
     int j = 0;
-    int k = 0;
     int id = 0;
-    int inc = 1;
 };
 
 /* forward declarations */
@@ -53,16 +52,15 @@ main(int argc, char **argv)
 
     std::array<pthread_t, NUM_THREADS> threadArr{};
     std::array<ThreadArgs, NUM_THREADS> threadArgs{};
+    pthread_barrier_init(&barrier, nullptr, NUM_THREADS);
 
     auto t1 = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < NUM_THREADS; ++i)
     {
-        threadArgs[i].k = k;
-        threadArgs[i].j = k + 1;
-        threadArgs[i].id = i;
         threadArgs[i].i = 1;
-        threadArgs[i].inc = 1;
+        threadArgs[i].j = 1;
+        threadArgs[i].id = i;
         pthread_create(&threadArr[i], nullptr, work, &threadArgs[i]);
     }
 
@@ -85,52 +83,80 @@ main(int argc, char **argv)
 void*
 work(void* args)
 {
-
+    ThreadArgs* arguments = static_cast<ThreadArgs*>(args);
 
     /* Gaussian elimination algorithm, Algo 8.4 from Grama */
-    for (int k = 0; k < matrixSize; k++) /* Outer loop */
+    for (int k = 0; k < matrixSize; ) /* Outer loop */
     {
+
         // Dividerar raden och sätter värdet på diagonalen till ett
-        for (int j = k + 1; j < matrixSize; j++)
+        arguments->i = k + 1 + arguments->id;
+        while (true)
         {
-            matrix[k][j] = matrix[k][j] / matrix[k][k]; /* Division step */
+            if (arguments->i >= matrixSize)
+            {
+                break;
+            }
+
+            matrix[k][arguments->i] = matrix[k][arguments->i] / matrix[k][k];
+
+            arguments->i += NUM_THREADS;
         }
 
-        result[k] = equalities[k] / matrix[k][k];
-        matrix[k][k] = 1.0;
+        pthread_barrier_wait(&barrier);
+        if (arguments->id == 0)
+        {
+            result[k] = equalities[k] / matrix[k][k];
+            matrix[k][k] = 1.0;
+        }
 
 
+        arguments->i = k + 1 + arguments->id;
+        while (true)
+        {
 
+            if (arguments->i >= matrixSize)
+            {
+                break;
+            }
+
+            arguments->j = k + 1;
+            while (true)
+            {
+                if (arguments->j >= matrixSize)
+                {
+                    break;
+                }
+
+                matrix[arguments->i][arguments->j] = matrix[arguments->i][arguments->j] - matrix[arguments->i][k] * matrix[k][arguments->j]; /* Elimination step */
+                ++arguments->j;
+            }
+
+
+            if (arguments->id == 0)
+            {
+                equalities[arguments->i] = equalities[arguments->i] - matrix[arguments->i][k] * result[k];
+                matrix[arguments->i][k] = 0.0;
+            }
+
+            arguments->i += NUM_THREADS;
+        }
+
+        pthread_barrier_wait(&barrier);
+
+        if (arguments->id == 0)
+        {
+            ++k;
+        }
     }
+
+    return nullptr;
 }
 
 void*
 parFunc(void* args)
 {
-    ThreadArgs* arguments = static_cast<ThreadArgs*>(args);
 
-    arguments->i = (arguments->id + 1) * arguments->inc + arguments->k;
-
-    while (true)
-    {
-
-        if (arguments->i >= matrixSize)
-        {
-            break;
-        }
-
-        for (arguments->j = arguments->k + 1; arguments->j < matrixSize; arguments->j++)
-        {
-            matrix[arguments->i][arguments->j] = matrix[arguments->i][arguments->j] - matrix[arguments->i][arguments->k] * matrix[arguments->k][arguments->j]; /* Elimination step */
-        }
-
-        equalities[arguments->i] = equalities[arguments->i] - matrix[arguments->i][arguments->k] * result[arguments->k];
-        matrix[arguments->i][arguments->k] = 0.0;
-
-        arguments->i += NUM_THREADS;
-    }
-
-    return nullptr;
 }
 
 void
