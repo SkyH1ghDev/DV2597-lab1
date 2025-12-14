@@ -11,7 +11,7 @@
 #include <iostream>
 
 constexpr int KILO = 1 << 10;
-constexpr int MEGA = 1 << 26;
+constexpr int MEGA = 1 << 20;
 constexpr int MAX_ITEMS = 1 << 26;
 constexpr int MAX_THREADS = 32;
 
@@ -39,7 +39,6 @@ static void
 init_array(void)
 {
     int i;
-    v = (unsigned int *) malloc(MAX_ITEMS * sizeof(int));
     for (i = 0; i < MAX_ITEMS; i++)
         v[i] = rand();
 }
@@ -119,8 +118,70 @@ quick_sort(void* pArgs)
 
     /* sort the two sub arrays */
 
+    int flags = static_cast<int>(pivot_index < high) << 2 | static_cast<int>(low < pivot_index) << 1 | static_cast<int>(availableThreads > 1) << 0;
+
+    switch (flags)
+    {
+        case 0b111:
+        [[fallthrough]]
+        case 0b101:
+        {
+            ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
+            threadArgs->AvailableThreads = availableThreads / 2;
+            args->AvailableThreads = availableThreads / 2;
+            threadArgs->High = high;
+            threadArgs->Low = pivot_index + 1;
+            threadArgs->ThreadArr = &args->ThreadArr[availableThreads / 2];
+            threadArgs->ThreadArgArr = threadArgs;
+            createdThreadID = availableThreads / 2;
+
+            static_cast<void>(pthread_create(&threadArr[createdThreadID], nullptr, quick_sort, threadArgs));
+        }
+        break;
+
+        case 0b100:
+            [[fallthrough]]
+        case 0b110:
+            quick_sort(pivot_index + 1, high);
+            break;
+
+        default:
+            break;
+    }
+
+    switch (flags)
+    {
+        case 0b011:
+            args->High = pivot_index - 1;
+            args->Low = low;
+
+            quick_sort(args);
+            break;
+
+        case 0b110:
+            [[fallthrough]]
+        case 0b010:
+            quick_sort(low, pivot_index - 1);
+            break;
+
+        case 0b111:
+            args->High = pivot_index - 1;
+            args->Low = low;
+
+            quick_sort(args);
+            [[fallthrough]];
+        case 0b101:
+            static_cast<void>(pthread_join(threadArr[createdThreadID], nullptr));
+            break;
+
+        default:
+            break;
+    }
+
     // right + thread creation
+    /*
     if (pivot_index < high && availableThreads > 1)
+    [[unlikely]]
     {
         ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
         threadArgs->AvailableThreads = availableThreads / 2;
@@ -135,19 +196,21 @@ quick_sort(void* pArgs)
     }
     // right
     else if (pivot_index < high)
+    [[likely]]
     {
         quick_sort(pivot_index + 1, high);
-    }
+    }*/
 
     // left + thread update
-    if (low < pivot_index && availableThreads > 1)
+    /*if (low < pivot_index && availableThreads > 1)
+    [[unlikely]]
     {
         args->High = pivot_index - 1;
         args->Low = low;
 
         quick_sort(args);
-    }
-    else if (low < pivot_index)
+    } else if (low < pivot_index)
+    [[likely]]
     {
         quick_sort(low, pivot_index - 1);
     }
@@ -155,7 +218,7 @@ quick_sort(void* pArgs)
     if (createdThreadID != -1)
     {
         static_cast<void>(pthread_join(threadArr[createdThreadID], nullptr));
-    }
+    }*/
 
     return nullptr;
 }
@@ -167,6 +230,7 @@ main(int argc, char** argv)
     std::array<ThreadArgs, MAX_THREADS> threadArgs{};
 
     //print_array();
+    v = static_cast<unsigned int*>(malloc(MAX_ITEMS * sizeof(int)));
 
     for (int numThreads = 1, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
@@ -189,6 +253,8 @@ main(int argc, char** argv)
 
         std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
                 std::chrono::duration<double>(t2 - t1).count() << "\n";
+
+        //print_array();
 
         ++iteration;
         if (iteration == 5)
