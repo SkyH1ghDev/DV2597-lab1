@@ -52,11 +52,11 @@ main(int argc, char** argv)
 
     Init_Default(); /* Init default values	*/
     Read_Options(argc, argv); /* Read arguments	*/
-    Init_Matrix(); /* Init the matrix	*/
 
     for (int numThreads = 1, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
+        Init_Matrix(); /* Init the matrix	*/
         g_currThreads = numThreads;
         std::array<pthread_t, MAX_THREADS> threadArr{};
         std::array<ThreadArgs, MAX_THREADS> threadArgs{};
@@ -149,10 +149,10 @@ Init_Matrix()
 {
     int i, j;
 
-    printf("\nsize      = %dx%d ", matrixSize, matrixSize);
-    printf("\nmaxnum    = %d \n", maxNumber);
-    printf("Init	  = %s \n", Init);
-    printf("Initializing matrix...");
+    //printf("\nsize      = %dx%d ", matrixSize, matrixSize);
+    //printf("\nmaxnum    = %d \n", maxNumber);
+    //printf("Init	  = %s \n", Init);
+    //printf("Initializing matrix...");
 
     if (strcmp(Init, "rand") == 0)
     {
@@ -188,7 +188,7 @@ Init_Matrix()
         result[i] = 1.0;
     }
 
-    printf("done \n\n");
+    //printf("done \n\n");
     if (PRINT == 1)
         Print_Matrix();
 }

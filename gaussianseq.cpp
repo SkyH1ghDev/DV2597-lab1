@@ -36,10 +36,10 @@ main(int argc, char **argv)
 
     Init_Default();		/* Init default values	*/
     Read_Options(argc,argv);	/* Read arguments	*/
-    Init_Matrix();		/* Init the matrix	*/
 
     for (int iteration = 0; iteration < 10; ++iteration)
     {
+        Init_Matrix(); /* Init the matrix	*/
         auto t1 = std::chrono::high_resolution_clock::now();
         work();
         auto t2 = std::chrono::high_resolution_clock::now();
@@ -76,10 +76,10 @@ Init_Matrix()
 {
     int i, j;
 
-    printf("\nsize      = %dx%d ", matrixSize, matrixSize);
-    printf("\nmaxnum    = %d \n", maxNumber);
-    printf("Init	  = %s \n", Init);
-    printf("Initializing matrix...");
+    //printf("\nsize      = %dx%d ", matrixSize, matrixSize);
+    //printf("\nmaxnum    = %d \n", maxNumber);
+    //printf("Init	  = %s \n", Init);
+    //printf("Initializing matrix...");
 
     if (strcmp(Init,"rand") == 0) {
         for (i = 0; i < matrixSize; i++){
@@ -108,7 +108,7 @@ Init_Matrix()
         result[i] = 1.0;
     }
 
-    printf("done \n\n");
+    //printf("done \n\n");
     if (PRINT == 1)
         Print_Matrix();
 }

@@ -33,7 +33,7 @@ target_link_libraries(qsort_parallel PRIVATE Threads::Threads)
 target_sources(
     qsort_sequential
     PRIVATE
-        qsortseq.c
+        qsortseq.cpp
 )
 target_sources(
     qsort_parallel

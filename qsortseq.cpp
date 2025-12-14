@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <iostream>
 
 #define KILO (1024)
 #define MEGA (1024*1024)
@@ -90,6 +92,16 @@ main(int argc, char **argv)
 {
     init_array();
     //print_array();
-    quick_sort(v, 0, MAX_ITEMS-1);
+
+    for (int iteration = 0; iteration < 10; ++iteration)
+    {
+        auto t1 = std::chrono::high_resolution_clock::now();
+        quick_sort(v, 0, MAX_ITEMS-1);
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        std::cout << "iteration: " << iteration << ", time: " <<
+                std::chrono::duration<double>(t2 - t1).count() << "\n";
+    }
+
     //print_array();
 }

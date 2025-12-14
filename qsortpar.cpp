@@ -17,8 +17,7 @@ static int *v;
 static void
 print_array(void)
 {
-    int i;
-    for (i = 0; i < MAX_ITEMS; i++)
+    for (int i = 0; i < MAX_ITEMS; i++)
         printf("%d ", v[i]);
     printf("\n");
 }
