@@ -78,7 +78,7 @@ main(int argc, char** argv)
         auto t2 = std::chrono::high_resolution_clock::now();
 
         std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
-                std::chrono::duration<double>(t2 - t1) << "\n";
+                std::chrono::duration<double>(t2 - t1).count() << "\n";
 
         ++iteration;
         if (iteration == 5)
