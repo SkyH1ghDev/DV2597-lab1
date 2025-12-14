@@ -38,14 +38,17 @@ main(int argc, char **argv)
     Read_Options(argc,argv);	/* Read arguments	*/
     Init_Matrix();		/* Init the matrix	*/
 
-    auto t1 = std::chrono::high_resolution_clock::now();
-    work();
-    auto t2 = std::chrono::high_resolution_clock::now();
+    for (int iteration = 0; iteration < 10; ++iteration)
+    {
+        auto t1 = std::chrono::high_resolution_clock::now();
+        work();
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::cout << iteration << std::chrono::duration<double>(t2- t1);
+    }
 
     if (PRINT == 1)
 	   Print_Matrix();
 
-    std::cout << std::chrono::duration<double>(t2-t1);
 }
 
 void

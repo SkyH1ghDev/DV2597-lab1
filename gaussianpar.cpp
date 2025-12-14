@@ -7,7 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
 #include <pthread.h>
 #include <array>
 #include <chrono>
@@ -24,7 +23,8 @@ int PRINT; /* print switch		*/
 Matrix matrix; /* matrix A		*/
 double equalities[MAX_SIZE]; /* vector b             */
 double result[MAX_SIZE]; /* vector y             */
-constexpr int NUM_THREADS = 16;
+constexpr int MAX_THREADS = 32;
+int g_currThreads = 0;
 pthread_barrier_t barrier;
 
 struct ThreadArgs
@@ -54,32 +54,45 @@ main(int argc, char** argv)
     Read_Options(argc, argv); /* Read arguments	*/
     Init_Matrix(); /* Init the matrix	*/
 
-    std::array<pthread_t, NUM_THREADS> threadArr{};
-    std::array<ThreadArgs, NUM_THREADS> threadArgs{};
-    pthread_barrier_init(&barrier, nullptr, NUM_THREADS);
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < NUM_THREADS; ++i)
+    for (int numThreads = 1, iteration = 0;
+         iteration < 5 && numThreads <= MAX_THREADS;)
     {
-        threadArgs[i].id = i;
-        static_cast<void>(pthread_create(&threadArr[i], nullptr, work, &threadArgs[i]));
-    }
+        g_currThreads = numThreads;
+        std::array<pthread_t, MAX_THREADS> threadArr{};
+        std::array<ThreadArgs, MAX_THREADS> threadArgs{};
+        pthread_barrier_init(&barrier, nullptr, numThreads);
 
-    for (int i = 0; i < NUM_THREADS; ++i)
-    {
-        static_cast<void>(pthread_join(threadArr[i], nullptr));
-    }
+        auto t1 = std::chrono::high_resolution_clock::now();
 
-    auto t2 = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < numThreads; ++i)
+        {
+            threadArgs[i].id = i;
+            static_cast<void>(pthread_create(&threadArr[i], nullptr, work, &threadArgs[i]));
+        }
+
+        for (int i = 0; i < numThreads; ++i)
+        {
+            static_cast<void>(pthread_join(threadArr[i], nullptr));
+        }
+
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
+                std::chrono::duration<double>(t2 - t1) << "\n";
+
+        ++iteration;
+        if (iteration == 5)
+        {
+            iteration = 0;
+            numThreads *= 2;
+        }
+    }
 
 
     if (PRINT == 1)
     {
         Print_Matrix();
     }
-
-    std::cout << std::chrono::duration<double>(t2 - t1);
 }
 
 void*
@@ -93,7 +106,7 @@ work(void* args)
 
         //std::cout << "Thread " << arguments->id << " has begun division step with K = " << k << "\n";
 
-        for (int i = k + 1 + arguments->id; i < matrixSize; i += NUM_THREADS)
+        for (int i = k + 1 + arguments->id; i < matrixSize; i += g_currThreads)
         {
             matrix[k][i] = matrix[k][i] / matrix[k][k];
         }
@@ -112,7 +125,7 @@ work(void* args)
 
         // ELIMINATION STEP
 
-        for (int i = k + 1 + arguments->id; i < matrixSize; i += NUM_THREADS)
+        for (int i = k + 1 + arguments->id; i < matrixSize; i += g_currThreads)
         {
             for (int j = k + 1; j < matrixSize; ++j)
             {
