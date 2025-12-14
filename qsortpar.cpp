@@ -7,12 +7,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <chrono>
+#include <iostream>
 
-constexpr int KILO = 1024;
-constexpr int MEGA = 1024 * 1024;
-constexpr int MAX_ITEMS = 64 * MEGA;
+constexpr int KILO = 1 << 10;
+constexpr int MEGA = 1 << 26;
+constexpr int MAX_ITEMS = 1 << 26;
+constexpr int MAX_THREADS = 32;
 
-static int *v;
+struct ThreadArgs
+{
+    unsigned int AvailableThreads = 0;
+    unsigned int Low = 0;
+    unsigned int High = 0;
+    pthread_t* ThreadArr = nullptr;
+    ThreadArgs* ThreadArgArr = nullptr;
+};
+
+
+static unsigned int* v;
 
 static void
 print_array(void)
@@ -26,13 +39,13 @@ static void
 init_array(void)
 {
     int i;
-    v = (int *) malloc(MAX_ITEMS*sizeof(int));
+    v = (unsigned int *) malloc(MAX_ITEMS * sizeof(int));
     for (i = 0; i < MAX_ITEMS; i++)
         v[i] = rand();
 }
 
-static unsigned
-partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
+static unsigned int
+partition(unsigned int low, unsigned int high, unsigned int pivot_index)
 {
     /* move pivot to the bottom of the vector */
     if (pivot_index != low)
@@ -47,7 +60,8 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
      */
 
     /* move elements into place */
-    while (low <= high) {
+    while (low <= high)
+    {
         if (v[low] <= v[pivot_index])
             low++;
         else if (v[high] > v[pivot_index])
@@ -63,32 +77,126 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
 }
 
 static void
-quick_sort(int *v, unsigned low, unsigned high)
+quick_sort(unsigned int low, unsigned int high)
 {
-    unsigned pivot_index;
-
     /* no need to sort a vector of zero or one element */
     if (low >= high)
         return;
 
     /* select the pivot value */
-    pivot_index = (low+high)/2;
+    unsigned int pivot_index = (low + high) / 2;
 
     /* partition the vector */
-    pivot_index = partition(v, low, high, pivot_index);
+    pivot_index = partition(low, high, pivot_index);
 
     /* sort the two sub arrays */
     if (low < pivot_index)
-        quick_sort(v, low, pivot_index-1);
+        quick_sort(low, pivot_index - 1);
     if (pivot_index < high)
-        quick_sort(v, pivot_index+1, high);
+        quick_sort(pivot_index + 1, high);
+}
+
+static void*
+quick_sort(void* pArgs)
+{
+    ThreadArgs* args = static_cast<ThreadArgs *>(pArgs);
+    unsigned int low = args->Low;
+    unsigned int high = args->High;
+    unsigned int availableThreads = args->AvailableThreads;
+    pthread_t* threadArr = args->ThreadArr;
+    ThreadArgs* threadArgArr = args->ThreadArgArr;
+    int createdThreadID = -1;
+
+    /* no need to sort a vector of zero or one element */
+    if (low >= high)
+        return nullptr;
+
+    /* select the pivot value */
+    unsigned int pivot_index = (low + high) / 2;
+
+    /* partition the vector */
+    pivot_index = partition(low, high, pivot_index);
+
+    /* sort the two sub arrays */
+
+    // right + thread creation
+    if (pivot_index < high && availableThreads > 1)
+    {
+        ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
+        threadArgs->AvailableThreads = availableThreads / 2;
+        args->AvailableThreads = availableThreads / 2;
+        threadArgs->High = high;
+        threadArgs->Low = pivot_index + 1;
+        threadArgs->ThreadArr = &args->ThreadArr[availableThreads / 2];
+        threadArgs->ThreadArgArr = threadArgs;
+        createdThreadID = availableThreads / 2;
+
+        static_cast<void>(pthread_create(&threadArr[createdThreadID], nullptr, quick_sort, threadArgs));
+    }
+    // right
+    else if (pivot_index < high)
+    {
+        quick_sort(pivot_index + 1, high);
+    }
+
+    // left + thread update
+    if (low < pivot_index && availableThreads > 1)
+    {
+        args->High = pivot_index - 1;
+        args->Low = low;
+
+        quick_sort(args);
+    }
+    else if (low < pivot_index)
+    {
+        quick_sort(low, pivot_index - 1);
+    }
+
+    if (createdThreadID != -1)
+    {
+        static_cast<void>(pthread_join(threadArr[createdThreadID], nullptr));
+    }
+
+    return nullptr;
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char** argv)
 {
-    init_array();
-    print_array();
-    quick_sort(v, 0, MAX_ITEMS-1);
-    print_array();
+    std::array<pthread_t, MAX_THREADS> threadArr{};
+    std::array<ThreadArgs, MAX_THREADS> threadArgs{};
+
+    //print_array();
+
+    for (int numThreads = 1, iteration = 0;
+         iteration < 5 && numThreads <= MAX_THREADS;)
+    {
+        init_array();
+
+        threadArgs[0].AvailableThreads = numThreads;
+        threadArgs[0].High = MAX_ITEMS;
+        threadArgs[0].Low = 0;
+        threadArgs[0].ThreadArr = threadArr.data();
+        threadArgs[0].ThreadArgArr = threadArgs.data();
+
+        auto t1 = std::chrono::high_resolution_clock::now();
+
+        static_cast<void>(pthread_create(&threadArr[0], nullptr, quick_sort, &threadArgs[0]));
+        static_cast<void>(pthread_join(threadArr[0], nullptr));
+
+
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
+                std::chrono::duration<double>(t2 - t1).count() << "\n";
+
+        ++iteration;
+        if (iteration == 5)
+        {
+            iteration = 0;
+            numThreads *= 2;
+        }
+    }
+
+    free(v);
 }

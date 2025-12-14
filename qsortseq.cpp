@@ -90,11 +90,12 @@ quick_sort(int *v, unsigned low, unsigned high)
 int
 main(int argc, char **argv)
 {
-    init_array();
     //print_array();
 
     for (int iteration = 0; iteration < 10; ++iteration)
     {
+        init_array();
+
         auto t1 = std::chrono::high_resolution_clock::now();
         quick_sort(v, 0, MAX_ITEMS-1);
         auto t2 = std::chrono::high_resolution_clock::now();
