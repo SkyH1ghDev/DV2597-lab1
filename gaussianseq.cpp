@@ -43,7 +43,7 @@ main(int argc, char **argv)
         auto t1 = std::chrono::high_resolution_clock::now();
         work();
         auto t2 = std::chrono::high_resolution_clock::now();
-        std::cout << iteration << std::chrono::duration<double>(t2- t1).count();
+        std::cout << "iteration: " << iteration << ", time: " << std::chrono::duration<double>(t2- t1).count() << "\n";
     }
 
     if (PRINT == 1)
