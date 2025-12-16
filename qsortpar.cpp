@@ -4,8 +4,8 @@
  *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -15,6 +15,7 @@ constexpr int MEGA = 1 << 20;
 constexpr int MAX_ITEMS = 1 << 26;
 constexpr int MAX_THREADS = 32;
 
+alignas(64)
 struct ThreadArgs
 {
     unsigned int AvailableThreads = 0;
@@ -75,7 +76,7 @@ partition(unsigned int low, unsigned int high, unsigned int pivot_index)
     return high;
 }
 
-static void
+void
 quick_sort(unsigned int low, unsigned int high)
 {
     /* no need to sort a vector of zero or one element */
@@ -95,16 +96,14 @@ quick_sort(unsigned int low, unsigned int high)
         quick_sort(pivot_index + 1, high);
 }
 
-static void*
-quick_sort(void* pArgs)
-{
+void*
+quick_sort(void* pArgs) {
     ThreadArgs* args = static_cast<ThreadArgs *>(pArgs);
     unsigned int low = args->Low;
     unsigned int high = args->High;
     unsigned int availableThreads = args->AvailableThreads;
     pthread_t* threadArr = args->ThreadArr;
     ThreadArgs* threadArgArr = args->ThreadArgArr;
-    int createdThreadID = -1;
 
     /* no need to sort a vector of zero or one element */
     if (low >= high)
@@ -123,7 +122,7 @@ quick_sort(void* pArgs)
     switch (flags)
     {
         case 0b111:
-        [[fallthrough]]
+        [[fallthrough]];
         case 0b101:
         {
             ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
@@ -133,14 +132,13 @@ quick_sort(void* pArgs)
             threadArgs->Low = pivot_index + 1;
             threadArgs->ThreadArr = &args->ThreadArr[availableThreads / 2];
             threadArgs->ThreadArgArr = threadArgs;
-            createdThreadID = availableThreads / 2;
 
-            static_cast<void>(pthread_create(&threadArr[createdThreadID], nullptr, quick_sort, threadArgs));
+            static_cast<void>(pthread_create(&threadArr[availableThreads / 2], nullptr, quick_sort, threadArgs));
         }
         break;
 
         case 0b100:
-            [[fallthrough]]
+            [[fallthrough]];
         case 0b110:
             quick_sort(pivot_index + 1, high);
             break;
@@ -159,7 +157,7 @@ quick_sort(void* pArgs)
             break;
 
         case 0b110:
-            [[fallthrough]]
+            [[fallthrough]];
         case 0b010:
             quick_sort(low, pivot_index - 1);
             break;
@@ -171,7 +169,7 @@ quick_sort(void* pArgs)
             quick_sort(args);
             [[fallthrough]];
         case 0b101:
-            static_cast<void>(pthread_join(threadArr[createdThreadID], nullptr));
+            static_cast<void>(pthread_join(threadArr[availableThreads / 2], nullptr));
             break;
 
         default:
