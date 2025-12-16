@@ -6,23 +6,33 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <deque>
+#include <tuple>
+#include <functional>
+
+enum ThreadStatusEnum : std::uint8_t
+{
+    Working = 0,
+    Waiting = 1,
+};
 
 constexpr int KILO = 1 << 10;
 constexpr int MEGA = 1 << 20;
 constexpr int MAX_ITEMS = 1 << 26;
 constexpr int MAX_THREADS = 32;
+int g_currThreads = 0;
+std::array<ThreadStatusEnum, MAX_THREADS> g_threadStatusArr = std::array<ThreadStatusEnum, MAX_THREADS>{};
+std::array<pthread_mutex_t, MAX_THREADS> g_queueMutexArr = std::array<pthread_mutex_t, MAX_THREADS>{};
+std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS> g_workQueueArr = std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS>{};
 
-alignas(64)
 struct ThreadArgs
 {
-    unsigned int AvailableThreads = 0;
-    unsigned int Low = 0;
-    unsigned int High = 0;
-    pthread_t* ThreadArr = nullptr;
-    ThreadArgs* ThreadArgArr = nullptr;
+    alignas(64)
+    std::uint8_t ThreadID = -1;
 };
 
 
@@ -77,7 +87,7 @@ partition(unsigned int low, unsigned int high, unsigned int pivot_index)
 }
 
 void
-quick_sort(unsigned int low, unsigned int high)
+quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
 {
     /* no need to sort a vector of zero or one element */
     if (low >= high)
@@ -89,136 +99,72 @@ quick_sort(unsigned int low, unsigned int high)
     /* partition the vector */
     pivot_index = partition(low, high, pivot_index);
 
-    /* sort the two sub arrays */
+    pthread_mutex_lock(&g_queueMutexArr[threadID]);
     if (low < pivot_index)
-        quick_sort(low, pivot_index - 1);
+        g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
     if (pivot_index < high)
-        quick_sort(pivot_index + 1, high);
+        g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+    pthread_mutex_unlock(&g_queueMutexArr[threadID]);
 }
 
 void*
-quick_sort(void* pArgs) {
-    ThreadArgs* args = static_cast<ThreadArgs *>(pArgs);
-    unsigned int low = args->Low;
-    unsigned int high = args->High;
-    unsigned int availableThreads = args->AvailableThreads;
-    pthread_t* threadArr = args->ThreadArr;
-    ThreadArgs* threadArgArr = args->ThreadArgArr;
-
-    /* no need to sort a vector of zero or one element */
-    if (low >= high)
-        return nullptr;
-
-    /* select the pivot value */
-    unsigned int pivot_index = (low + high) / 2;
-
-    /* partition the vector */
-    pivot_index = partition(low, high, pivot_index);
-
-    /* sort the two sub arrays */
-
-    int flags = static_cast<int>(pivot_index < high) << 2 | static_cast<int>(low < pivot_index) << 1 | static_cast<int>(availableThreads > 1) << 0;
-
-    switch (flags)
+worker(void* pArgs)
+{
+    while (true)
     {
-        case 0b111:
-        [[fallthrough]];
-        case 0b101:
+        ThreadArgs* tArgs = static_cast<ThreadArgs *>(pArgs);
+        std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)> task = nullptr;
+        std::uint32_t low = -1;
+        std::uint32_t high = -1;
+
+        g_threadStatusArr[tArgs->ThreadID] = Working;
+
+        // Check if own queue has task
+        pthread_mutex_lock(&g_queueMutexArr[tArgs->ThreadID]);
+        if (!g_workQueueArr[tArgs->ThreadID].empty())
         {
-            ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
-            threadArgs->AvailableThreads = availableThreads / 2;
-            args->AvailableThreads = availableThreads / 2;
-            threadArgs->High = high;
-            threadArgs->Low = pivot_index + 1;
-            threadArgs->ThreadArr = &args->ThreadArr[availableThreads / 2];
-            threadArgs->ThreadArgArr = threadArgs;
+            task = std::get<0>(g_workQueueArr[tArgs->ThreadID].front());
+            low = std::get<1>(g_workQueueArr[tArgs->ThreadID].front());
+            high = std::get<2>(g_workQueueArr[tArgs->ThreadID].front());
 
-            static_cast<void>(pthread_create(&threadArr[availableThreads / 2], nullptr, quick_sort, threadArgs));
+            g_workQueueArr[tArgs->ThreadID].erase(g_workQueueArr[tArgs->ThreadID].begin());
         }
-        break;
+        pthread_mutex_unlock(&g_queueMutexArr[tArgs->ThreadID]);
 
-        case 0b100:
-            [[fallthrough]];
-        case 0b110:
-            quick_sort(pivot_index + 1, high);
-            break;
+        // If no task found, steal from other threads
+        while (task == nullptr)
+        {
+            std::uint8_t index = rand() % g_currThreads;
 
-        default:
-            break;
+            pthread_mutex_lock(&g_queueMutexArr[index]);
+            if (!g_workQueueArr[index].empty())
+            {
+                task = std::get<0>(g_workQueueArr[tArgs->ThreadID].back());
+                low = std::get<1>(g_workQueueArr[tArgs->ThreadID].back());
+                high = std::get<2>(g_workQueueArr[tArgs->ThreadID].back());
+
+                g_workQueueArr[index].erase(g_workQueueArr[index].end());
+            }
+            pthread_mutex_unlock(&g_queueMutexArr[index]);
+
+            std::uint8_t numWaiting = 0;
+            for (int i = 0; i < g_currThreads; ++i)
+            {
+                numWaiting += g_threadStatusArr[i];
+            }
+
+            if (numWaiting == g_currThreads)
+            {
+                return nullptr;
+            }
+
+            g_threadStatusArr[tArgs->ThreadID] = Waiting;
+        }
+
+        g_threadStatusArr[tArgs->ThreadID] = Working;
+
+        task(low, high, tArgs->ThreadID);
     }
-
-    switch (flags)
-    {
-        case 0b011:
-            args->High = pivot_index - 1;
-            args->Low = low;
-
-            quick_sort(args);
-            break;
-
-        case 0b110:
-            [[fallthrough]];
-        case 0b010:
-            quick_sort(low, pivot_index - 1);
-            break;
-
-        case 0b111:
-            args->High = pivot_index - 1;
-            args->Low = low;
-
-            quick_sort(args);
-            [[fallthrough]];
-        case 0b101:
-            static_cast<void>(pthread_join(threadArr[availableThreads / 2], nullptr));
-            break;
-
-        default:
-            break;
-    }
-
-    // right + thread creation
-    /*
-    if (pivot_index < high && availableThreads > 1)
-    [[unlikely]]
-    {
-        ThreadArgs* threadArgs = &threadArgArr[availableThreads / 2];
-        threadArgs->AvailableThreads = availableThreads / 2;
-        args->AvailableThreads = availableThreads / 2;
-        threadArgs->High = high;
-        threadArgs->Low = pivot_index + 1;
-        threadArgs->ThreadArr = &args->ThreadArr[availableThreads / 2];
-        threadArgs->ThreadArgArr = threadArgs;
-        createdThreadID = availableThreads / 2;
-
-        static_cast<void>(pthread_create(&threadArr[createdThreadID], nullptr, quick_sort, threadArgs));
-    }
-    // right
-    else if (pivot_index < high)
-    [[likely]]
-    {
-        quick_sort(pivot_index + 1, high);
-    }*/
-
-    // left + thread update
-    /*if (low < pivot_index && availableThreads > 1)
-    [[unlikely]]
-    {
-        args->High = pivot_index - 1;
-        args->Low = low;
-
-        quick_sort(args);
-    } else if (low < pivot_index)
-    [[likely]]
-    {
-        quick_sort(low, pivot_index - 1);
-    }
-
-    if (createdThreadID != -1)
-    {
-        static_cast<void>(pthread_join(threadArr[createdThreadID], nullptr));
-    }*/
-
-    return nullptr;
 }
 
 int
@@ -227,25 +173,32 @@ main(int argc, char** argv)
     std::array<pthread_t, MAX_THREADS> threadArr{};
     std::array<ThreadArgs, MAX_THREADS> threadArgs{};
 
+    for (auto& mutex : g_queueMutexArr)
+    {
+        pthread_mutex_init(&mutex, nullptr);
+    }
+
     //print_array();
-    v = static_cast<unsigned int*>(malloc(MAX_ITEMS * sizeof(int)));
+    v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(int)));
 
     for (int numThreads = 1, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();
-
-        threadArgs[0].AvailableThreads = numThreads;
-        threadArgs[0].High = MAX_ITEMS;
-        threadArgs[0].Low = 0;
-        threadArgs[0].ThreadArr = threadArr.data();
-        threadArgs[0].ThreadArgArr = threadArgs.data();
+        g_currThreads = numThreads;
+        g_workQueueArr[0].emplace_front(quick_sort, 0, MAX_ITEMS);
 
         auto t1 = std::chrono::high_resolution_clock::now();
 
-        static_cast<void>(pthread_create(&threadArr[0], nullptr, quick_sort, &threadArgs[0]));
-        static_cast<void>(pthread_join(threadArr[0], nullptr));
-
+        for (int i = 0; i < numThreads; ++i)
+        {
+            threadArgs[i].ThreadID = i;
+            static_cast<void>(pthread_create(&threadArr[i], nullptr, worker, &threadArgs[i]));
+        }
+        for (int i = 0; i < numThreads; ++i)
+        {
+            static_cast<void>(pthread_join(threadArr[i], nullptr));
+        }
 
         auto t2 = std::chrono::high_resolution_clock::now();
 
