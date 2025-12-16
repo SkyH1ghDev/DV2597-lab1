@@ -238,7 +238,7 @@ main(int argc, char** argv)
         std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
                 std::chrono::duration<double>(t2 - t1).count() << "\n";
 
-        print_array();
+        //print_array();
 
         ++iteration;
         if (iteration == 5)
