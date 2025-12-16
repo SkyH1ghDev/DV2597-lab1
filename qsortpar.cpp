@@ -23,7 +23,7 @@ enum ThreadStatusEnum : std::uint8_t
 constexpr int KILO = 1 << 10;
 constexpr int MEGA = 1 << 20;
 constexpr int MAX_ITEMS = 1 << 26;
-constexpr int MAX_THREADS = 32;
+constexpr int MAX_THREADS = 64;
 int g_currThreads = 0;
 std::array<ThreadStatusEnum, MAX_THREADS> g_threadStatusArr = std::array<ThreadStatusEnum, MAX_THREADS>{};
 std::array<pthread_mutex_t, MAX_THREADS> g_queueMutexArr = std::array<pthread_mutex_t, MAX_THREADS>{};
@@ -181,7 +181,7 @@ main(int argc, char** argv)
     //print_array();
     v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(std::uint32_t)));
 
-    for (int numThreads = 2, iteration = 0;
+    for (int numThreads = 32, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();
