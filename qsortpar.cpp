@@ -181,7 +181,7 @@ main(int argc, char** argv)
     //print_array();
     v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(int)));
 
-    for (int numThreads = 1, iteration = 0;
+    for (int numThreads = 2, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();

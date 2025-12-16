@@ -29,6 +29,8 @@ target_sources(
 
 # QSORT
 target_link_libraries(qsort_parallel PRIVATE Threads::Threads)
+target_compile_options(qsort_parallel PRIVATE -fsanitize=address)
+target_link_options(qsort_parallel PRIVATE -fsanitize=address)
 
 target_sources(
     qsort_sequential
