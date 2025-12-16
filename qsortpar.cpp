@@ -110,7 +110,7 @@ void
 quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
 {
     /* no need to sort a vector of zero or one element */
-    if (high - low < 16)
+    if (high - low < 32)
     {
         insertion_sort(low, high);
         return;
