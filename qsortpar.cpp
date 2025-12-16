@@ -36,7 +36,7 @@ struct ThreadArgs
 };
 
 
-static unsigned int* v;
+static std::uint32_t* v;
 
 static void
 print_array(void)
@@ -127,7 +127,7 @@ worker(void* pArgs)
             low = std::get<1>(g_workQueueArr[tArgs->ThreadID].front());
             high = std::get<2>(g_workQueueArr[tArgs->ThreadID].front());
 
-            g_workQueueArr[tArgs->ThreadID].erase(g_workQueueArr[tArgs->ThreadID].begin());
+            g_workQueueArr[tArgs->ThreadID].pop_front();
         }
         pthread_mutex_unlock(&g_queueMutexArr[tArgs->ThreadID]);
 
@@ -139,11 +139,11 @@ worker(void* pArgs)
             pthread_mutex_lock(&g_queueMutexArr[index]);
             if (!g_workQueueArr[index].empty())
             {
-                task = std::get<0>(g_workQueueArr[tArgs->ThreadID].back());
-                low = std::get<1>(g_workQueueArr[tArgs->ThreadID].back());
-                high = std::get<2>(g_workQueueArr[tArgs->ThreadID].back());
+                task = std::get<0>(g_workQueueArr[index].back());
+                low = std::get<1>(g_workQueueArr[index].back());
+                high = std::get<2>(g_workQueueArr[index].back());
 
-                g_workQueueArr[index].erase(g_workQueueArr[index].end());
+                g_workQueueArr[index].pop_back();
             }
             pthread_mutex_unlock(&g_queueMutexArr[index]);
 
@@ -179,14 +179,14 @@ main(int argc, char** argv)
     }
 
     //print_array();
-    v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(int)));
+    v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(std::uint32_t)));
 
     for (int numThreads = 2, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();
         g_currThreads = numThreads;
-        g_workQueueArr[0].emplace_front(quick_sort, 0, MAX_ITEMS);
+        g_workQueueArr[0].emplace_front(quick_sort, 0, MAX_ITEMS - 1);
 
         auto t1 = std::chrono::high_resolution_clock::now();
 
