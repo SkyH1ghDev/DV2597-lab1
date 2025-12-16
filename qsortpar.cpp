@@ -27,7 +27,9 @@ constexpr int MAX_THREADS = 32;
 int g_currThreads = 0;
 std::array<ThreadStatusEnum, MAX_THREADS> g_threadStatusArr = std::array<ThreadStatusEnum, MAX_THREADS>{};
 std::array<pthread_mutex_t, MAX_THREADS> g_queueMutexArr = std::array<pthread_mutex_t, MAX_THREADS>{};
-std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS> g_workQueueArr = std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS>{};
+std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t,
+    std::uint32_t>>, MAX_THREADS> g_workQueueArr = std::array<std::deque<std::tuple<std::function<void
+    (std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS>{};
 
 struct ThreadArgs
 {
@@ -87,11 +89,32 @@ partition(unsigned int low, unsigned int high, unsigned int pivot_index)
 }
 
 void
+insertion_sort(std::uint32_t low, std::uint32_t high)
+{
+    for (int i = low + 1; i <= high; ++i)
+    {
+        int key = v[i];
+        int j = i - 1;
+
+        while (j >= 0 && v[j] > key)
+        {
+            v[j + 1] = v[j];
+            j = j - 1;
+        }
+
+        v[j + 1] = key;
+    }
+}
+
+void
 quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
 {
     /* no need to sort a vector of zero or one element */
-    if (low >= high)
+    if (high - low < 16)
+    {
+        insertion_sort(low, high);
         return;
+    }
 
     /* select the pivot value */
     unsigned int pivot_index = (low + high) / 2;
@@ -100,10 +123,20 @@ quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
     pivot_index = partition(low, high, pivot_index);
 
     pthread_mutex_lock(&g_queueMutexArr[threadID]);
-    if (low < pivot_index)
-        g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
-    if (pivot_index < high)
-        g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+    if (high - pivot_index <= pivot_index - low)
+    {
+        if (pivot_index < high)
+            g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+        if (low < pivot_index)
+            g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
+    }
+    else
+    {
+        if (low < pivot_index)
+            g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
+        if (pivot_index < high)
+            g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+    }
     pthread_mutex_unlock(&g_queueMutexArr[threadID]);
 }
 
@@ -173,7 +206,7 @@ main(int argc, char** argv)
     std::array<pthread_t, MAX_THREADS> threadArr{};
     std::array<ThreadArgs, MAX_THREADS> threadArgs{};
 
-    for (auto& mutex : g_queueMutexArr)
+    for (auto& mutex: g_queueMutexArr)
     {
         pthread_mutex_init(&mutex, nullptr);
     }
@@ -205,7 +238,7 @@ main(int argc, char** argv)
         std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
                 std::chrono::duration<double>(t2 - t1).count() << "\n";
 
-        //print_array();
+        print_array();
 
         ++iteration;
         if (iteration == 5)
