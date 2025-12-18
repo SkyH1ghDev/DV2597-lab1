@@ -106,18 +106,39 @@ insertion_sort(std::uint32_t low, std::uint32_t high)
     }
 }
 
+static void
+quick_sort(std::uint32_t low, std::uint32_t high)
+{
+
+    /* no need to sort a vector of zero or one element */
+    if (low >= high)
+        return;
+
+    /* select the pivot value */
+    std::uint32_t pivot_index = (low + high) / 2;
+
+    /* partition the vector */
+    pivot_index = partition(low, high, pivot_index);
+
+    /* sort the two sub arrays */
+    if (low < pivot_index)
+        quick_sort(low, pivot_index - 1);
+    if (pivot_index < high)
+        quick_sort(pivot_index + 1, high);
+}
+
 void
 quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
 {
     /* no need to sort a vector of zero or one element */
-    if (high - low < 48)
+    if (high - low < 5000)
     {
-        insertion_sort(low, high);
+        quick_sort(low, high);
         return;
     }
 
     /* select the pivot value */
-    unsigned int pivot_index = (low + high) / 2;
+    std::uint32_t pivot_index = (low + high) / 2;
 
     /* partition the vector */
     pivot_index = partition(low, high, pivot_index);
@@ -126,16 +147,16 @@ quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
     if (high - pivot_index <= pivot_index - low)
     {
         if (pivot_index < high)
-            g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+            g_workQueueArr[threadID].emplace_front(static_cast<void(*)(std::uint32_t, std::uint32_t, std::uint8_t)>(quick_sort), pivot_index + 1, high);
         if (low < pivot_index)
-            g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
+            g_workQueueArr[threadID].emplace_front(static_cast<void(*)(std::uint32_t, std::uint32_t, std::uint8_t)>(quick_sort), low, pivot_index - 1);
     }
     else
     {
         if (low < pivot_index)
-            g_workQueueArr[threadID].emplace_front(quick_sort, low, pivot_index - 1);
+            g_workQueueArr[threadID].emplace_front(static_cast<void(*)(std::uint32_t, std::uint32_t, std::uint8_t)>(quick_sort), low, pivot_index - 1);
         if (pivot_index < high)
-            g_workQueueArr[threadID].emplace_front(quick_sort, pivot_index + 1, high);
+            g_workQueueArr[threadID].emplace_front(static_cast<void(*)(std::uint32_t, std::uint32_t, std::uint8_t)>(quick_sort), pivot_index + 1, high);
     }
     pthread_mutex_unlock(&g_queueMutexArr[threadID]);
 }
@@ -214,12 +235,12 @@ main(int argc, char** argv)
     //print_array();
     v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(std::uint32_t)));
 
-    for (int numThreads = 1, iteration = 0;
+    for (int numThreads = 8, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();
         g_currThreads = numThreads;
-        g_workQueueArr[0].emplace_front(quick_sort, 0, MAX_ITEMS - 1);
+        g_workQueueArr[0].emplace_front(static_cast<void(*)(std::uint32_t, std::uint32_t, std::uint8_t)>(quick_sort), 0, MAX_ITEMS - 1);
 
         auto t1 = std::chrono::high_resolution_clock::now();
 
