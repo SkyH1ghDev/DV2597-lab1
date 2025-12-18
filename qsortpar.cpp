@@ -131,7 +131,7 @@ void
 quick_sort(std::uint32_t low, std::uint32_t high, std::uint8_t threadID)
 {
     /* no need to sort a vector of zero or one element */
-    if (high - low < 5000)
+    if (high - low < 10000)
     {
         quick_sort(low, high);
         return;
@@ -235,7 +235,7 @@ main(int argc, char** argv)
     //print_array();
     v = static_cast<unsigned int *>(malloc(MAX_ITEMS * sizeof(std::uint32_t)));
 
-    for (int numThreads = 8, iteration = 0;
+    for (int numThreads = 1, iteration = 0;
          iteration < 5 && numThreads <= MAX_THREADS;)
     {
         init_array();
