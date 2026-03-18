@@ -25,11 +25,20 @@ constexpr int MEGA = 1 << 20;
 constexpr int MAX_ITEMS = 1 << 26;
 constexpr int MAX_THREADS = 32;
 int g_currThreads = 0;
-std::array<ThreadStatusEnum, MAX_THREADS> g_threadStatusArr = std::array<ThreadStatusEnum, MAX_THREADS>{};
-std::array<pthread_mutex_t, MAX_THREADS> g_queueMutexArr = std::array<pthread_mutex_t, MAX_THREADS>{};
-std::array<std::deque<std::tuple<std::function<void(std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t,
-    std::uint32_t>>, MAX_THREADS> g_workQueueArr = std::array<std::deque<std::tuple<std::function<void
-    (std::uint32_t, std::uint32_t, std::uint8_t)>, std::uint32_t, std::uint32_t>>, MAX_THREADS>{};
+std::array<ThreadStatusEnum, MAX_THREADS> g_threadStatusArr{};
+std::array<pthread_mutex_t, MAX_THREADS> g_queueMutexArr{};
+std::array<
+    std::deque<
+        std::tuple<
+            std::function<
+                void(std::uint32_t, std::uint32_t, std::uint8_t)
+            >,
+            std::uint32_t,
+            std::uint32_t
+        >
+    >,
+    MAX_THREADS
+> g_workQueueArr{};
 
 struct ThreadArgs
 {
