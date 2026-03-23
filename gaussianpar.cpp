@@ -53,11 +53,13 @@ main(int argc, char** argv)
     Init_Default(); /* Init default values	*/
     Read_Options(argc, argv); /* Read arguments	*/
 
-    for (int numThreads = 1, iteration = 0;
-         iteration < 5 && numThreads <= MAX_THREADS;)
+    //for (int numThreads = 1, iteration = 0;
+    //     iteration < 5 && numThreads <= MAX_THREADS;)
     {
         Init_Matrix(); /* Init the matrix	*/
-        g_currThreads = numThreads;
+        g_currThreads = 32;
+        int numThreads = 32;
+
         std::array<pthread_t, MAX_THREADS> threadArr{};
         std::array<ThreadArgs, MAX_THREADS> threadArgs{};
         pthread_barrier_init(&barrier, nullptr, numThreads);
@@ -77,15 +79,15 @@ main(int argc, char** argv)
 
         auto t2 = std::chrono::high_resolution_clock::now();
 
-        std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
-                std::chrono::duration<double>(t2 - t1).count() << "\n";
+        //std::cout << "iteration: " << iteration << ", num threads: " << numThreads << ", time: " <<
+        //        std::chrono::duration<double>(t2 - t1).count() << "\n";
 
-        ++iteration;
+        /*++iteration;
         if (iteration == 5)
         {
             iteration = 0;
             numThreads *= 2;
-        }
+        }*/
     }
 
 

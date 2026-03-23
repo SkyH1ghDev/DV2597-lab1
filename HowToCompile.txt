@@ -1,3 +1,4 @@
 1. Open your console of choice
-2. do "cmake --build ./Build --target gauss_sequential gauss_parallel qsort_sequential qsort_parallel"
+2a. do "cmake -S . -B ./Build"
+2b. do "cmake --build ./Build --target gauss_sequential gauss_parallel qsort_sequential qsort_parallel"
 3. Open the new "Build" folder and executables should be there

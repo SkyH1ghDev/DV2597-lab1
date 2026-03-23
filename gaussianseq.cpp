@@ -37,13 +37,13 @@ main(int argc, char **argv)
     Init_Default();		/* Init default values	*/
     Read_Options(argc,argv);	/* Read arguments	*/
 
-    for (int iteration = 0; iteration < 10; ++iteration)
+    //for (int iteration = 0; iteration < 10; ++iteration)
     {
         Init_Matrix(); /* Init the matrix	*/
         auto t1 = std::chrono::high_resolution_clock::now();
         work();
         auto t2 = std::chrono::high_resolution_clock::now();
-        std::cout << "iteration: " << iteration << ", time: " << std::chrono::duration<double>(t2- t1).count() << "\n";
+        //std::cout << "iteration: " << iteration << ", time: " << std::chrono::duration<double>(t2- t1).count() << "\n";
     }
 
     if (PRINT == 1)
