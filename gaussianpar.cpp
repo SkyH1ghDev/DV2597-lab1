@@ -24,7 +24,7 @@ Matrix matrix; /* matrix A		*/
 double equalities[MAX_SIZE]; /* vector b             */
 double result[MAX_SIZE]; /* vector y             */
 constexpr int MAX_THREADS = 32;
-int g_currThreads = 32;
+int g_currThreads = 0;
 pthread_barrier_t barrier;
 
 struct ThreadArgs
